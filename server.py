@@ -236,6 +236,36 @@ def dispatch(method, path, query, headers, body):
             "file": GH_PATH,
         })
 
+    if p == "/api/force_sync":
+        if not GH_TOKEN:
+            return _resp(200, {"ok": False, "error": "no_token"})
+        try:
+            try:
+                req = urllib.request.Request(_gh_url(), headers=_gh_headers())
+                resp = urllib.request.urlopen(req, timeout=20)
+                sha = json.loads(resp.read()).get("sha")
+                exists = True
+            except urllib.error.HTTPError as e:
+                if e.code == 404:
+                    sha = None; exists = False
+                else:
+                    return _resp(200, {"ok": False, "stage": "get", "code": e.code,
+                                        "detail": e.read().decode("utf-8", "ignore")[:400]})
+            content = base64.b64encode(json.dumps(DATA, ensure_ascii=False).encode("utf-8")).decode("utf-8")
+            body = {"message": "force sync", "content": content}
+            if sha:
+                body["sha"] = sha
+            req2 = urllib.request.Request(_gh_url(), data=json.dumps(body).encode("utf-8"),
+                                          headers=_gh_headers({"Content-Type": "application/json"}),
+                                          method="PUT")
+            resp2 = urllib.request.urlopen(req2, timeout=20)
+            return _resp(200, {"ok": True, "exists_before": exists, "http": resp2.getcode()})
+        except urllib.error.HTTPError as e:
+            return _resp(200, {"ok": False, "stage": "put", "code": e.code,
+                               "detail": e.read().decode("utf-8", "ignore")[:400]})
+        except Exception as e:
+            return _resp(200, {"ok": False, "stage": "exception", "detail": str(e)[:400]})
+
     if method == "GET":
         if p == "/api/me":
             uid = _uid_from(headers)
