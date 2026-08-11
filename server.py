@@ -151,6 +151,7 @@ def restore_from_github():
     except urllib.error.HTTPError as e:
         if e.code == 404:
             print("[github] 仓库中尚无数据文件，将在首次变更后创建")
+            _restored = True  # 无远程文件即视为恢复阶段结束，允许首次创建
             return False
         print("[github] 恢复失败(忽略):", e)
         return False
@@ -167,10 +168,18 @@ def _restore_loop():
         if restore_from_github():
             return
         time.sleep(20)
+    _restored = True  # 重试耗尽（如持续网络错误）也视为恢复阶段结束
 
 def sync_to_github():
     global _restored
-    if not GH_TOKEN or not _restored:
+    if not GH_TOKEN:
+        return
+    # 等待启动恢复阶段结束（最多约 25s），避免覆盖远程已有数据
+    for _ in range(10):
+        if _restored:
+            break
+        time.sleep(2.5)
+    if not _restored:
         return
     for attempt in range(3):
         try:
