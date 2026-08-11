@@ -1,0 +1,13 @@
+# Render Blueprint：把本仓库连上后，Render 会按这个文件自动配置并部署
+# 你只需在 Render 后台点一次 "Deploy" 即可，不用手动填命令。
+services:
+  - type: web
+    name: family-ledger
+    runtime: python
+    plan: free
+    branch: main
+    startCommand: python server.py
+    healthCheckPath: /api/ping
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
