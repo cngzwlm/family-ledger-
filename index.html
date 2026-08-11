@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<title>家庭自驾记账</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="自驾记账">
+<meta name="theme-color" content="#F4F1EA">
+<style>
+:root{
+  --bg:#F4F1EA;
+  --card:#FFFFFF;
+  --text:#23211E;
+  --muted:#6E6A62;
+  --hint:#96938C;
+  --line:rgba(35,33,30,.10);
+  --primary:#C2552B;
+  --primary-dark:#9E4322;
+  --primary-soft:#FBEDE6;
+  --danger:#B23B3B;
+  --radius:14px;
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-t:env(safe-area-inset-top,0px);
+}
+[hidden]{display:none!important}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",Helvetica,"Microsoft YaHei",sans-serif;
+  font-size:15px;
+  line-height:1.5;
+  overscroll-behavior-y:none;
+}
+input,select,button,textarea{font-family:inherit;font-size:inherit;color:inherit}
+.boot{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:var(--bg);z-index:99}
+.boot-logo{width:56px;height:56px;border-radius:16px;background:var(--primary);position:relative;animation:pulse 1.2s ease-in-out infinite}
+.boot-logo::after{content:"¥";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:28px;font-weight:500}
+.boot-text{color:var(--muted);font-size:13px}
+.boot-err{max-width:300px;margin-top:4px;background:#FCEBEB;color:#8E2C2C;border-radius:9px;padding:10px 13px;font-size:12.5px;line-height:1.6;text-align:center}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+.screen{display:none;min-height:100%}
+.screen.on{display:block}
+.auth-wrap{
+  max-width:460px;margin:0 auto;
+  padding:calc(var(--safe-t) + 44px) 20px calc(var(--safe-b) + 32px);
+}
+.brand{text-align:center;margin-bottom:26px}
+.brand-icon{width:64px;height:64px;border-radius:19px;background:var(--primary);margin:0 auto 14px;position:relative}
+.brand-icon::after{content:"¥";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:32px;font-weight:500}
+.brand-title{margin:0 0 5px;font-size:21px;font-weight:500;letter-spacing:.5px}
+.brand-sub{margin:0;color:var(--muted);font-size:13px}
+.seg{display:flex;background:rgba(35,33,30,.06);border-radius:11px;padding:3px;margin-bottom:16px}
+.seg-btn{flex:1;border:0;background:transparent;padding:9px 6px;border-radius:9px;color:var(--muted);font-size:14px;cursor:pointer;transition:.15s}
+.seg-btn.active{background:var(--card);color:var(--text);font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.card{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:14px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+.field input,.field select{
+  width:100%;padding:12px 13px;border:1px solid var(--line);border-radius:10px;
+  background:#FCFBF8;outline:none;font-size:16px;
+}
+.field input:focus,.field select:focus{border-color:var(--primary);background:#fff}
+.field input::placeholder{color:#B8B4AC;font-size:14px}
+.code-input{letter-spacing:6px;text-transform:uppercase;font-size:20px;text-align:center}
+.btn-primary{
+  width:100%;padding:14px;border:0;border-radius:11px;background:var(--primary);
+  color:#fff;font-size:16px;font-weight:500;cursor:pointer;margin-top:2px;
+}
+.btn-primary:active{background:var(--primary-dark)}
+.btn-primary:disabled{opacity:.5}
+.btn-secondary{
+  width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;
+  background:#FCFBF8;color:var(--text);font-size:15px;cursor:pointer;margin-top:6px;
+}
+.btn-secondary.danger{color:var(--danger);border-color:rgba(178,59,59,.3)}
+.btn-text{display:block;width:100%;background:none;border:0;color:var(--muted);font-size:14px;padding:12px;cursor:pointer}
+.hint{margin:10px 0 0;font-size:12px;color:var(--hint);text-align:center;line-height:1.6}
+.err{background:#FCEBEB;color:#8E2C2C;border-radius:9px;padding:10px 12px;font-size:13px;margin-bottom:12px}
+.topbar{background:var(--primary);color:#fff;padding-top:var(--safe-t)}
+.topbar-inner{padding:16px 20px 22px;max-width:640px;margin:0 auto}
+.topbar-name{font-size:13px;opacity:.85;margin-bottom:6px}
+.topbar-total{font-size:38px;font-weight:500;line-height:1.1;letter-spacing:-.5px}
+.topbar-total .cny{font-size:22px;margin-right:3px;opacity:.9}
+.topbar-sub{font-size:12px;opacity:.8;margin-top:6px}
+.content{max-width:640px;margin:0 auto;padding:16px 16px calc(var(--safe-b) + 92px)}
+.sec{margin-bottom:20px}
+.sec-title{font-size:13px;color:var(--muted);margin:0 0 8px 4px}
+.empty{color:var(--hint);font-size:13px;text-align:center;padding:14px 0}
+.empty-big{text-align:center;padding:70px 20px;color:var(--muted)}
+.empty-big p{margin:6px 0}
+.empty-icon{width:52px;height:52px;border-radius:15px;background:rgba(35,33,30,.06);margin:0 auto 16px}
+.cat-row{display:flex;align-items:center;gap:10px;padding:9px 0}
+.cat-row+.cat-row{border-top:1px solid var(--line)}
+.dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+.cat-name{flex:0 0 62px;font-size:14px}
+.bar{flex:1;height:7px;background:rgba(35,33,30,.07);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px}
+.cat-amt{flex:0 0 auto;font-size:14px;font-variant-numeric:tabular-nums;min-width:66px;text-align:right}
+.cat-pct{flex:0 0 34px;font-size:11px;color:var(--hint);text-align:right}
+.row{display:flex;justify-content:space-between;align-items:center;padding:11px 0;gap:12px}
+.row+.row{border-top:1px solid var(--line)}
+.row-k{color:var(--muted);font-size:14px;flex:0 0 auto}
+.row-v{font-size:14px;text-align:right;font-variant-numeric:tabular-nums;word-break:break-all}
+.row-v.code{letter-spacing:3px;font-weight:500;color:var(--primary);font-size:17px}
+.settle-line{font-size:14px;padding:10px 0;line-height:1.6}
+.settle-line+.settle-line{border-top:1px solid var(--line)}
+.settle-line b{color:var(--primary);font-weight:500}
+.settle-ok{color:var(--muted);font-size:13px;text-align:center;padding:12px 0}
+.day{margin-bottom:16px}
+.day-head{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);padding:0 4px 6px}
+.tx{display:flex;align-items:center;gap:11px;background:var(--card);padding:12px 14px}
+.tx:first-child{border-radius:var(--radius) var(--radius) 0 0}
+.tx:last-child{border-radius:0 0 var(--radius) var(--radius)}
+.tx:only-child{border-radius:var(--radius)}
+.tx+.tx{border-top:1px solid var(--line)}
+.tx-ico{width:34px;height:34px;border-radius:10px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px}
+.tx-mid{flex:1;min-width:0}
+.tx-note{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx-meta{font-size:12px;color:var(--hint);margin-top:2px}
+.tx-amt{font-size:16px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tx-del{border:0;background:none;color:var(--hint);font-size:19px;padding:4px 2px 4px 8px;cursor:pointer;line-height:1}
+.fab{
+  position:fixed;right:20px;bottom:calc(var(--safe-b) + 74px);
+  width:56px;height:56px;border-radius:50%;border:0;background:var(--primary);color:#fff;
+  font-size:30px;line-height:1;cursor:pointer;box-shadow:0 4px 14px rgba(194,85,43,.35);z-index:20;
+}
+.fab:active{background:var(--primary-dark)}
+.tabbar{
+  position:fixed;left:0;right:0;bottom:0;display:flex;
+  background:rgba(255,255,255,.94);backdrop-filter:blur(12px);
+  border-top:1px solid var(--line);padding-bottom:var(--safe-b);z-index:15;
+}
+.tab{flex:1;border:0;background:none;padding:9px 0 7px;color:var(--hint);font-size:11px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.tab.active{color:var(--primary)}
+.tab-ico{width:20px;height:20px;background:currentColor;
+  -webkit-mask-size:contain;mask-size:contain;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center}
+.ico-chart{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='12' width='4' height='9' rx='1'/%3E%3Crect x='10' y='6' width='4' height='15' rx='1'/%3E%3Crect x='17' y='9' width='4' height='12' rx='1'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='12' width='4' height='9' rx='1'/%3E%3Crect x='10' y='6' width='4' height='15' rx='1'/%3E%3Crect x='17' y='9' width='4' height='12' rx='1'/%3E%3C/svg%3E")}
+.ico-list{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='5' width='18' height='2.6' rx='1.3'/%3E%3Crect x='3' y='11' width='18' height='2.6' rx='1.3'/%3E%3Crect x='3' y='17' width='18' height='2.6' rx='1.3'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='5' width='18' height='2.6' rx='1.3'/%3E%3Crect x='3' y='11' width='18' height='2.6' rx='1.3'/%3E%3Crect x='3' y='17' width='18' height='2.6' rx='1.3'/%3E%3C/svg%3E")}
+.ico-gear{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 8a4 4 0 100 8 4 4 0 000-8zm9 4a9 9 0 01-.1 1.3l2 1.6-2 3.4-2.4-1a9 9 0 01-2.2 1.3l-.4 2.6h-4l-.4-2.6a9 9 0 01-2.2-1.3l-2.4 1-2-3.4 2-1.6A9 9 0 013 12c0-.4 0-.9.1-1.3l-2-1.6 2-3.4 2.4 1a9 9 0 012.2-1.3L8.1 3h4l.4 2.4a9 9 0 012.2 1.3l2.4-1 2 3.4-2 1.6c.1.4.1.9.1 1.3z'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 8a4 4 0 100 8 4 4 0 000-8zm9 4a9 9 0 01-.1 1.3l2 1.6-2 3.4-2.4-1a9 9 0 01-2.2 1.3l-.4 2.6h-4l-.4-2.6a9 9 0 01-2.2-1.3l-2.4 1-2-3.4 2-1.6A9 9 0 013 12c0-.4 0-.9.1-1.3l-2-1.6 2-3.4 2.4 1a9 9 0 012.2-1.3L8.1 3h4l.4 2.4a9 9 0 012.2 1.3l2.4-1 2 3.4-2 1.6c.1.4.1.9.1 1.3z'/%3E%3C/svg%3E")}
+.sheet-mask{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:30}
+.sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:31;background:var(--bg);
+  border-radius:18px 18px 0 0;max-height:92vh;display:flex;flex-direction:column;
+  animation:up .22s ease-out;
+}
+@keyframes up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line)}
+.sheet-title{font-size:16px;font-weight:500}
+.sheet-cancel,.sheet-save{border:0;background:none;font-size:16px;cursor:pointer;padding:4px 2px}
+.sheet-cancel{color:var(--muted)}
+.sheet-save{color:var(--primary);font-weight:500}
+.sheet-body{padding:16px 16px calc(var(--safe-b) + 24px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.amount-box{display:flex;align-items:baseline;gap:6px;background:var(--card);border-radius:var(--radius);padding:18px 16px;margin-bottom:18px}
+.amount-cny{font-size:24px;color:var(--muted)}
+.amount-input{flex:1;border:0;background:none;outline:none;font-size:38px;font-weight:500;width:100%;padding:0;font-variant-numeric:tabular-nums}
+.amount-input::placeholder{color:#D6D2C9}
+.cat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:18px}
+.cat-btn{border:1px solid var(--line);background:var(--card);border-radius:11px;padding:11px 4px;font-size:13px;cursor:pointer;transition:.12s}
+.cat-btn.sel{color:#fff;border-color:transparent;font-weight:500}
+.toast{
+  position:fixed;left:50%;bottom:calc(var(--safe-b) + 110px);transform:translateX(-50%);
+  background:rgba(35,33,30,.92);color:#fff;padding:10px 18px;border-radius:20px;font-size:14px;z-index:60;
+}
+.footnote{font-size:11px;color:var(--hint);text-align:center;padding:8px 12px;line-height:1.7}
+</style>
+</head>
+<body>
+
+<div id="boot" class="boot" hidden>
+  <div class="boot-logo"></div>
+  <div class="boot-text" id="boot-text">正在加载…</div>
+  <div class="boot-err" id="boot-err" hidden></div>
+</div>
+
+<!-- ══════════ 登录 / 注册 ══════════ -->
+<section id="screen-auth" class="screen on">
+  <div class="auth-wrap">
+    <div class="brand">
+      <div class="brand-icon"></div>
+      <h1 class="brand-title">家庭自驾记账</h1>
+      <p class="brand-sub">一家人，一本账，各自记</p>
+    </div>
+
+    <div class="seg" id="auth-seg">
+      <button class="seg-btn active" data-mode="signin">登录</button>
+      <button class="seg-btn" data-mode="signup">注册</button>
+    </div>
+
+    <div class="card">
+      <div class="field" id="f-name" hidden>
+        <label>你的称呼</label>
+        <input id="in-name" type="text" placeholder="例如：爸爸 / 小敏" autocomplete="nickname">
+      </div>
+      <div class="field">
+        <label>邮箱</label>
+        <input id="in-email" type="email" placeholder="用于登录，随便一个能记住的邮箱" autocomplete="email" autocapitalize="none" spellcheck="false">
+      </div>
+      <div class="field">
+        <label>密码</label>
+        <input id="in-pass" type="password" placeholder="至少 6 位" autocomplete="current-password">
+      </div>
+      <div class="err" id="auth-err" hidden></div>
+      <button class="btn-primary" id="btn-auth">登录</button>
+      <p class="hint" id="auth-hint">还没有账号？点上面的「注册」先建一个</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 建账本 / 加入账本 ══════════ -->
+<section id="screen-setup" class="screen">
+  <div class="auth-wrap">
+    <div class="brand">
+      <div class="brand-icon"></div>
+      <h1 class="brand-title">开始记账</h1>
+      <p class="brand-sub">第一个人建账本，另一个人用邀请码加入</p>
+    </div>
+
+    <div class="seg" id="setup-seg">
+      <button class="seg-btn active" data-mode="create">建一个新账本</button>
+      <button class="seg-btn" data-mode="join">加入已有账本</button>
+    </div>
+
+    <div class="card" id="setup-create">
+      <div class="field">
+        <label>账本名字</label>
+        <input id="in-hname" type="text" placeholder="例如：2026 川西自驾">
+      </div>
+      <button class="btn-primary" id="btn-create">创建账本</button>
+      <p class="hint">创建后会得到一个 6 位邀请码，发给家人即可一起记</p>
+    </div>
+
+    <div class="card" id="setup-join" hidden>
+      <div class="field">
+        <label>邀请码</label>
+        <input id="in-code" type="text" placeholder="6 位字母数字" maxlength="6" autocapitalize="characters" spellcheck="false" class="code-input">
+      </div>
+      <button class="btn-primary" id="btn-join">加入账本</button>
+      <p class="hint">向已建好账本的家人要这个码</p>
+    </div>
+
+    <div class="err" id="setup-err" hidden></div>
+    <button class="btn-text" id="btn-logout-setup">退出登录</button>
+  </div>
+</section>
+
+<!-- ══════════ 主界面 ══════════ -->
+<section id="screen-main" class="screen">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="topbar-name" id="hh-name">账本</div>
+      <div class="topbar-total">
+        <span class="cny">¥</span><span id="hh-total">0</span>
+      </div>
+      <div class="topbar-sub" id="hh-sub">共 0 笔支出</div>
+    </div>
+  </header>
+
+  <main class="content">
+    <div class="pane" id="pane-summary">
+      <div class="sec">
+        <div class="sec-title">按类别</div>
+        <div class="card" id="cat-list"><div class="empty">还没有记录</div></div>
+      </div>
+      <div class="sec">
+        <div class="sec-title">谁付的钱</div>
+        <div class="card" id="person-list"><div class="empty">还没有记录</div></div>
+      </div>
+      <div class="sec">
+        <div class="sec-title">均摊结算</div>
+        <div class="card" id="settle-list"><div class="empty">还没有记录</div></div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-list" hidden>
+      <div id="tx-groups"></div>
+      <div class="empty-big" id="tx-empty">
+        <div class="empty-icon"></div>
+        <p>还没有记过账</p>
+        <p class="hint">点右下角的 + 记第一笔</p>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-settings" hidden>
+      <div class="sec">
+        <div class="sec-title">账本</div>
+        <div class="card">
+          <div class="row"><span class="row-k">名字</span><span class="row-v" id="set-hname">—</span></div>
+          <div class="row"><span class="row-k">邀请码</span><span class="row-v code" id="set-code">—</span></div>
+          <button class="btn-secondary" id="btn-copy">复制邀请码，发给家人</button>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="sec-title">我</div>
+        <div class="card">
+          <div class="row"><span class="row-k">称呼</span><span class="row-v" id="set-name">—</span></div>
+          <div class="row"><span class="row-k">账号</span><span class="row-v" id="set-email">—</span></div>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="sec-title">数据备份</div>
+        <div class="card">
+          <button class="btn-secondary" id="btn-export">导出备份（下载 JSON 到手机）</button>
+          <button class="btn-secondary" id="btn-import">从备份恢复</button>
+          <input type="file" id="file-import" accept="application/json" hidden>
+          <p class="hint">导出可把整本账存到手机；万一数据丢失，点「从备份恢复」选回刚才的文件即可还原。</p>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="card">
+          <button class="btn-secondary danger" id="btn-logout">退出登录</button>
+        </div>
+      </div>
+      <p class="footnote" id="mode-note"></p>
+    </div>
+  </main>
+
+  <button class="fab" id="btn-add" aria-label="记一笔">+</button>
+
+  <nav class="tabbar">
+    <button class="tab active" data-pane="summary"><span class="tab-ico ico-chart"></span><span>汇总</span></button>
+    <button class="tab" data-pane="list"><span class="tab-ico ico-list"></span><span>明细</span></button>
+    <button class="tab" data-pane="settings"><span class="tab-ico ico-gear"></span><span>设置</span></button>
+  </nav>
+</section>
+
+<!-- ══════════ 记一笔（弹层） ══════════ -->
+<div class="sheet-mask" id="sheet-mask" hidden></div>
+<div class="sheet" id="sheet-add" hidden>
+  <div class="sheet-head">
+    <button class="sheet-cancel" id="btn-cancel">取消</button>
+    <div class="sheet-title">记一笔</div>
+    <button class="sheet-save" id="btn-save">保存</button>
+  </div>
+  <div class="sheet-body">
+    <div class="amount-box">
+      <span class="amount-cny">¥</span>
+      <input id="in-amount" type="text" inputmode="decimal" placeholder="0.00" class="amount-input">
+    </div>
+
+    <div class="sec-title">类别</div>
+    <div class="cat-grid" id="cat-grid"></div>
+
+    <div class="field">
+      <label>备注</label>
+      <input id="in-note" type="text" placeholder="例如：中石化加满 / 高速费">
+    </div>
+
+    <div class="field">
+      <label>谁付的</label>
+      <select id="in-payer"></select>
+    </div>
+
+    <div class="field">
+      <label>日期</label>
+      <input id="in-date" type="date">
+    </div>
+
+    <div class="err" id="add-err" hidden></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+/* 独立兜底（与主脚本分开）：即使下面主脚本出错，页面加载后也会强制显示登录界面，绝不永远停在「正在加载」 */
+window.addEventListener('DOMContentLoaded', function () {
+  setTimeout(function () {
+    var b = document.getElementById('boot');
+    var a = document.getElementById('screen-auth');
+    if (b && !b.hidden) b.hidden = true;
+    if (a) a.classList.add('on');
+  }, 2500);
+});
+</script>
+<script src="supabase.js"></script>
+<script>
+/* 兜底：无论如何，2 秒内必须让界面可见，绝不永远「正在加载」 */
+window.__booted = false;
+function forceShow() {
+  if (window.__booted) return;
+  var boot = document.getElementById('boot');
+  var auth = document.getElementById('screen-auth');
+  if (boot) boot.hidden = true;
+  if (auth) auth.classList.add('on');
+  var note = document.getElementById('mode-note');
+  if (note && !note.textContent) note.textContent = '当前为本地演示模式（数据只存在本机浏览器）。若按钮点不动，请刷新页面或换 Chrome / Safari 打开。';
+}
+setTimeout(forceShow, 2000);
+window.addEventListener('error', function (e) {
+  if (window.__booted) return;
+  var boot = document.getElementById('boot');
+  if (boot) boot.hidden = false;
+  var b = document.getElementById('boot-err');
+  if (!b) return;
+  b.hidden = false;
+  b.textContent = '加载出错：' + (e.message || e.type);
+});
+
+/* ══════════ 应用代码（已内嵌，无外部依赖） ══════════ */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBA08Tws42LGX05ZwdMbHpXeh5noR6n9jw",
+  authDomain: "cngzwlm677196.firebaseapp.com",
+  projectId: "cngzwlm677196",
+  storageBucket: "cngzwlm677196.firebasestorage.app",
+  messagingSenderId: "939609857921",
+  appId: "1:939609857921:web:420e7585c2ef4e81115280"
+};
+
+/* ══════════ LeanCloud 云端配置（国内可达，两台手机随时随地同步，无需家里电脑） ══════════
+   在 LeanCloud 控制台「设置 → 应用 Keys」里复制下面三项填进来：
+   - appId：应用 ID
+   - appKey：应用 Key（注意：不要填 Master Key）
+   - serverURL：REST API 服务器地址（同一页面有「API 地址 / Server URL」）
+   填好后，两个手机用此网页即可随时随地同步。留空则维持原来的本机/演示模式。 */
+const CLOUD_CONFIG = {
+  appId: "",
+  appKey: "",
+  serverURL: ""   // 例如 https://xxxx.api.lncldapi.com 或 https://xxxx.api.lncldglobal.com
+};
+
+/* ══════════ Supabase 云端配置（数据永久保存，不怕重部署，国内网络可达） ══════════
+   在 Supabase 控制台（项目 → Project Settings → API）复制下面两项填进来：
+   - url：Project URL，形如 https://xxxxxxxxxxxx.supabase.co
+   - anonKey：Project API keys 里的 anon public key（以 eyJ 开头的一长串）
+   填好后：① 把 supabase_schema.sql 的内容贴到 Supabase 的 SQL Editor 执行一次建表；
+           ② 重新部署到 Render。之后两台手机的数据就永久保存在 Supabase，重部署也不丢。
+   留空则维持原来的「本机服务器 / 演示」模式。 */
+const SUPABASE_CONFIG = {
+  url: "https://jrjigmgutrsjesmqvyzg.supabase.co",
+  anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpyamdpbWd1dHJzamVzbXF5eXpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NDkwOTAsImV4cCI6MjEwMjAyNTA5MH0.nPnrLpJmHHhu4DUa_KZ0YJxd1PZ8RML72Ar9DfBZJvU"
+};
+
+const CATS = [
+  { name: '油费',   color: '#EF9F27' },
+  { name: '过路费', color: '#378ADD' },
+  { name: '住宿',   color: '#7F77DD' },
+  { name: '餐饮',   color: '#639922' },
+  { name: '门票',   color: '#D4537E' },
+  { name: '购物',   color: '#BA7517' },
+  { name: '其他',   color: '#888780' },
+];
+const catColor = n => (CATS.find(c => c.name === n) || CATS[6]).color;
+
+const $ = id => document.getElementById(id);
+const money = n => (Math.round(n * 100) / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money0 = n => Math.abs(n - Math.round(n)) < 0.005 ? Math.round(n).toLocaleString('zh-CN') : money(n);
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(t._tm);
+  t._tm = setTimeout(() => { t.hidden = true; }, 1900);
+}
+function makeCode() {
+  const s = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({ length: 6 }, () => s[Math.floor(Math.random() * s.length)]).join('');
+}
+function zhError(e) {
+  const c = (e && (e.code || e.message)) || '';
+  if (c.includes('invalid-credential') || c.includes('wrong-password') || c.includes('user-not-found'))
+    return '邮箱或密码不对，请检查后重试';
+  if (c.includes('email-already-in-use')) return '这个邮箱已经注册过了，直接去「登录」';
+  if (c.includes('invalid-email')) return '邮箱格式不对';
+  if (c.includes('weak-password')) return '密码太短，至少要 6 位';
+  if (c.includes('network')) return '网络连不上，检查一下手机网络';
+  if (c.includes('operation-not-allowed')) return 'Firebase 后台还没打开「邮箱/密码」登录方式';
+  if (c.includes('permission-denied')) return '数据库权限不足，需要在 Firebase 后台粘贴安全规则';
+  return c || '出错了，请重试';
+}
+
+/* ══════════ 演示后端（数据存本机） ══════════ */
+const Demo = (() => {
+  const K = 'ftl_demo_v1';
+  const BLANK = '{"users":{},"households":{},"txs":{},"session":null}';
+  let mem = null;
+  const store = {
+    get() {
+      try { return localStorage.getItem(K); } catch (e) { return mem; }
+    },
+    set(v) {
+      try { localStorage.setItem(K, v); } catch (e) { mem = v; }
+    },
+  };
+  const load = () => { try { return JSON.parse(store.get() || BLANK); } catch (e) { return JSON.parse(BLANK); } };
+  const save = d => store.set(JSON.stringify(d));
+  let authCb = null, txCb = null, txHid = null;
+  const fire = () => {
+    if (!txCb || !txHid) return;
+    const d = load();
+    txCb((d.txs[txHid] || []).filter(t => !t.isDeleted));
+  };
+  return {
+    isDemo: true,
+    onAuth(cb) {
+      authCb = cb;
+      const d = load();
+      setTimeout(() => cb(d.session ? d.users[d.session] : null), 60);
+    },
+    async signUp(email, pass, name) {
+      const d = load();
+      if (Object.values(d.users).some(u => u.email === email)) { const e = new Error('email-already-in-use'); throw e; }
+      if (pass.length < 6) throw new Error('weak-password');
+      const uid = 'u' + Date.now();
+      d.users[uid] = { uid, email, pass, displayName: name, householdId: '' };
+      d.session = uid; save(d); authCb && authCb(d.users[uid]);
+    },
+    async signIn(email, pass) {
+      const d = load();
+      const u = Object.values(d.users).find(x => x.email === email && x.pass === pass);
+      if (!u) throw new Error('invalid-credential');
+      d.session = u.uid; save(d); authCb && authCb(u);
+    },
+    async signOut() { const d = load(); d.session = null; save(d); txHid = null; authCb && authCb(null); },
+    async createHousehold(uid, name, myName) {
+      const d = load(); const hid = 'h' + Date.now(); const code = makeCode();
+      d.households[hid] = { id: hid, name, inviteCode: code, members: [uid], memberProfiles: { [uid]: myName } };
+      d.txs[hid] = []; d.users[uid].householdId = hid; save(d); return hid;
+    },
+    async joinHousehold(uid, code, myName) {
+      const d = load();
+      const h = Object.values(d.households).find(x => x.inviteCode === code);
+      if (!h) throw new Error('邀请码无效，请确认后重试');
+      if (!h.members.includes(uid)) h.members.push(uid);
+      h.memberProfiles[uid] = myName;
+      d.users[uid].householdId = h.id; save(d); return h.id;
+    },
+    async getHousehold(hid) { return load().households[hid] || null; },
+    watchTx(hid, cb) { txHid = hid; txCb = cb; fire(); },
+    async addTx(hid, tx) {
+      const d = load();
+      (d.txs[hid] = d.txs[hid] || []).push({ ...tx, id: 't' + Date.now() + Math.random().toString(36).slice(2, 6) });
+      save(d); fire();
+    },
+    async delTx(hid, id) {
+      const d = load(); const t = (d.txs[hid] || []).find(x => x.id === id);
+      if (t) t.isDeleted = true; save(d); fire();
+    },
+  };
+})();
+
+/* ══════════ 本机服务器后端（账号/账本存在 Mac，多设备共用） ══════════ */
+const LocalAPI = (() => {
+  const TK = 'ftl_token_v1';
+  const getTok = () => { try { return localStorage.getItem(TK) || ''; } catch (e) { return ''; } };
+  const setTok = t => { try { localStorage.setItem(TK, t); } catch (e) {} };
+  const delTok = () => { try { localStorage.removeItem(TK); } catch (e) {} };
+  let authCb = null;
+  const call = async (path, body) => {
+    const headers = { 'Content-Type': 'application/json' };
+    const tok = getTok();
+    if (tok) headers['Authorization'] = 'Bearer ' + tok;
+    const r = await fetch(path, { method: body ? 'POST' : 'GET', headers, body: body ? JSON.stringify(body) : undefined });
+    let j = null; try { j = await r.json(); } catch (e) {}
+    if (!r.ok) { throw new Error((j && j.error) || ('请求失败 (' + r.status + ')')); }
+    return j;
+  };
+  const refresh = async () => {
+    if (!authCb) return;
+    const tok = getTok();
+    if (!tok) { authCb(null); return; }
+    try { authCb(await call('/api/me')); }
+    catch (e) { delTok(); authCb(null); }
+  };
+  return {
+    isDemo: false,
+    onAuth(cb) { authCb = cb; setTimeout(refresh, 60); },
+    async signUp(email, pass, name) { const j = await call('/api/register', { email, pass, name }); setTok(j.token); await refresh(); },
+    async signIn(email, pass) { const j = await call('/api/login', { email, pass }); setTok(j.token); await refresh(); },
+    async signOut() { try { await call('/api/logout'); } catch (e) {} delTok(); await refresh(); },
+    async createHousehold(uid, name, myName) { const j = await call('/api/create', { name, myName }); await refresh(); return j.id; },
+    async joinHousehold(uid, code, myName) { const j = await call('/api/join', { code, myName }); await refresh(); return j.id; },
+    async getHousehold(hid) { return await call('/api/household?hid=' + encodeURIComponent(hid)); },
+    watchTx(hid, cb) {
+      let alive = true;
+      const poll = async () => {
+        if (!alive) return;
+        try { cb(await call('/api/tx?hid=' + encodeURIComponent(hid))); } catch (e) {}
+        if (alive) setTimeout(poll, 1500);
+      };
+      poll();
+      return () => { alive = false; };
+    },
+    async addTx(hid, tx) { await call('/api/tx', { hid, tx }); },
+    async delTx(hid, id) { await call('/api/del', { hid, id }); },
+  };
+})();
+
+/* ══════════ LeanCloud 云端后端（国内可达，多设备同步，无需家里电脑） ══════════ */
+const LeanCloud = (() => {
+  let authCb = null;
+  const cur = () => (typeof AV !== 'undefined' && AV.User ? AV.User.current() : null);
+  const toUser = u => u ? {
+    uid: u.id,
+    email: u.get('username') || '',
+    displayName: u.get('displayName') || (u.get('username') || '').split('@')[0],
+    householdId: u.get('householdId') || ''
+  } : null;
+  const refresh = () => { if (authCb) authCb(toUser(cur())); };
+  const membersACL = members => {
+    const acl = new AV.ACL();
+    acl.setPublicReadAccess(false); acl.setPublicWriteAccess(false);
+    (members || []).forEach(m => { acl.setReadAccess(m, true); acl.setWriteAccess(m, true); });
+    return acl;
+  };
+  return {
+    isDemo: false,
+    async init(cfg) { AV.init({ appId: cfg.appId, appKey: cfg.appKey, serverURL: cfg.serverURL }); },
+    onAuth(cb) { authCb = cb; setTimeout(refresh, 60); },
+    async signUp(email, pass, name) {
+      const u = new AV.User();
+      u.set('username', email); u.set('password', pass); u.set('displayName', name);
+      await u.signUp();
+      refresh();
+    },
+    async signIn(email, pass) { await AV.User.loginWithEmail(email, pass); refresh(); },
+    async signOut() { await AV.User.logOut(); refresh(); },
+    async createHousehold(uid, name, myName) {
+      const code = makeCode();
+      const H = AV.Object.extend('Household');
+      const h = new H();
+      h.set('name', name); h.set('inviteCode', code);
+      h.set('members', [uid]); h.set('memberProfiles', { [uid]: myName }); h.set('owner', uid);
+      const ha = new AV.ACL(); ha.setPublicReadAccess(true); ha.setPublicWriteAccess(true); // 账本可被邀请码找到并加入；账单明细由下面 Txn 的 ACL 保护，仅成员可见
+      h.setACL(ha);
+      await h.save();
+      const u = cur(); if (u) { u.set('householdId', h.id); await u.save(); }
+      refresh();
+      return h.id;
+    },
+    async joinHousehold(uid, code, myName) {
+      const q = new AV.Query('Household'); q.equalTo('inviteCode', code);
+      const h = await q.first();
+      if (!h) throw new Error('邀请码无效，请确认后重试');
+      const acl = h.getACL(); acl.setReadAccess(uid, true); acl.setWriteAccess(uid, true); h.setACL(acl);
+      const members = h.get('members') || []; if (!members.includes(uid)) members.push(uid);
+      h.set('members', members);
+      const mp = h.get('memberProfiles') || {}; mp[uid] = myName; h.set('memberProfiles', mp);
+      await h.save();
+      const u = cur(); if (u) { u.set('householdId', h.id); await u.save(); }
+      refresh();
+      return h.id;
+    },
+    async getHousehold(hid) {
+      const q = new AV.Query('Household');
+      const h = await q.get(hid);
+      if (!h) return null;
+      return { id: h.id, name: h.get('name'), inviteCode: h.get('inviteCode'), members: h.get('members') || [], memberProfiles: h.get('memberProfiles') || {} };
+    },
+    watchTx(hid, cb) {
+      const q = new AV.Query('Txn'); q.equalTo('hid', hid); q.descending('createdAt');
+      const poll = async () => {
+        try {
+          const list = await q.find();
+          cb(list.filter(t => !t.get('isDeleted')).map(t => ({
+            id: t.id, amount: Number(t.get('amount')) || 0, category: t.get('category') || '其他',
+            note: t.get('note') || '', paidBy: t.get('paidBy') || '', paidById: t.get('paidById') || '',
+            date: t.get('date') || '', isDeleted: false
+          })));
+        } catch (e) {}
+        setTimeout(poll, 1500);
+      };
+      poll();
+      return () => {};
+    },
+    async addTx(hid, tx) {
+      const u = cur();
+      const T = AV.Object.extend('Txn');
+      const t = new T();
+      t.set('hid', hid); t.set('amount', Number(tx.amount) || 0); t.set('category', tx.category);
+      t.set('note', tx.note); t.set('paidBy', tx.paidBy); t.set('paidById', tx.paidById);
+      t.set('date', tx.date); t.set('createdBy', tx.createdBy);
+      const members = (S.hh && S.hh.members) || (u ? [u.id] : []);
+      t.setACL(membersACL(members));
+      await t.save();
+    },
+    async delTx(hid, id) {
+      const t = AV.Object.createWithoutData('Txn', id); t.set('isDeleted', true); await t.save();
+    },
+  };
+})();
+
+/* ══════════ Supabase 云端后端（数据永久保存，国内可达，多设备实时同步） ══════════
+   表结构见 supabase_schema.sql（需在 Supabase SQL Editor 执行一次）。
+   账号用 Supabase 内置 Auth（邮箱+密码），账单用两张表：households / transactions。 */
+const SupabaseBE = (() => {
+  const cfg = SUPABASE_CONFIG || {};
+  let client = null;
+  let authCb = null;
+  const toUser = u => u ? ({
+    uid: u.id,
+    email: u.email || '',
+    displayName: (u.user_metadata && u.user_metadata.displayName) || (u.email || '').split('@')[0],
+    householdId: (u.user_metadata && u.user_metadata.householdId) || ''
+  }) : null;
+  const refresh = async () => { if (!authCb) return; const { data } = await client.auth.getUser(); authCb(toUser(data.user)); };
+  const setMeta = async (patch) => {
+    const { data } = await client.auth.updateUser({ data: patch });
+    if (authCb) authCb(toUser(data.user));
+    return toUser(data.user);
+  };
+  const meta = () => ({ displayName: S.user ? S.user.displayName : '', householdId: S.user ? S.user.householdId : '' });
+  return {
+    isDemo: false,
+    async init() {
+      if (typeof supabase === 'undefined') throw new Error('Supabase SDK 未加载');
+      // 反向代理：把对 supabase.co 的请求改写为同源的 /sb/，绕过部分地区对 supabase.co 的网络限制
+      const _orig = (globalThis.fetch || window.fetch).bind(globalThis);
+      const wrap = (input, init) => {
+        const rewrite = (u) => {
+          try {
+            const url = new URL(u, location.href);
+            if (url.hostname.endsWith('supabase.co')) {
+              return '/sb/' + url.pathname.replace(/^\//, '') + url.search + url.hash;
+            }
+          } catch (e) {}
+          return null;
+        };
+        if (typeof input === 'string') {
+          const np = rewrite(input);
+          return _orig(np || input, init);
+        }
+        if (input && typeof input.url === 'string') {
+          const np = rewrite(input.url);
+          if (np) return _orig(new Request(np, input), init);
+          return _orig(input, init);
+        }
+        return _orig(input, init);
+      };
+      globalThis.fetch = wrap;
+      if (window.fetch) window.fetch = wrap;
+      client = supabase.createClient(cfg.url, cfg.anonKey, {
+        fetch: wrap,
+        auth: { persistSession: true, autoRefreshToken: true, fetch: wrap }
+      });
+    },
+    onAuth(cb) {
+      authCb = cb;
+      client.auth.onAuthStateChange(async (event, session) => {
+        cb(toUser(session && session.user ? session.user : null));
+      });
+      setTimeout(refresh, 60);
+    },
+    async signUp(email, pass, name) {
+      const { data, error } = await client.auth.signUp({ email, password: pass, options: { data: { displayName: name, householdId: '' } } });
+      if (error) throw error;
+      if (!data.user) throw new Error('注册失败，请稍后重试');
+    },
+    async signIn(email, pass) {
+      const { data, error } = await client.auth.signInWithPassword({ email, password: pass });
+      if (error) throw error;
+    },
+    async signOut() { await client.auth.signOut(); if (authCb) authCb(null); },
+    async createHousehold(uid, name, myName) {
+      let hid = null, code = makeCode();
+      for (let i = 0; i < 5; i++) {
+        const { data, error } = await client.from('households').insert({
+          invite_code: code, name, owner: uid, members: [uid], member_profiles: { [uid]: myName }
+        }).select('id').single();
+        if (!error && data) { hid = data.id; break; }
+        if (error && !String(error.message).includes('invite_code')) throw error;
+        code = makeCode();
+      }
+      if (!hid) throw new Error('创建账本失败，请重试');
+      await setMeta({ displayName: myName, householdId: hid });
+      return hid;
+    },
+    async joinHousehold(uid, code, myName) {
+      const { data, error } = await client.rpc('join_household', { p_code: code, p_name: myName });
+      if (error) {
+        if (String((error.message || '')).includes('INVALID_CODE')) throw new Error('邀请码无效，请确认后重试');
+        throw error;
+      }
+      if (!data) throw new Error('邀请码无效，请确认后重试');
+      await setMeta({ displayName: myName, householdId: data });
+      return data;
+    },
+    async getHousehold(hid) {
+      const { data, error } = await client.from('households').select('*').eq('id', hid).single();
+      if (error) return null;
+      return { id: data.id, name: data.name, inviteCode: data.invite_code, members: data.members || [], memberProfiles: data.member_profiles || {} };
+    },
+    watchTx(hid, cb) {
+      let alive = true;
+      const poll = async () => {
+        if (!alive) return;
+        try {
+          const { data, error } = await client.from('transactions')
+            .select('*').eq('household_id', hid).eq('is_deleted', false).order('created_at', { ascending: false });
+          if (!error && data) cb(data.map(t => ({
+            id: t.id, amount: Number(t.amount) || 0, category: t.category || '其他',
+            note: t.note || '', paidBy: t.paid_by || '', paidById: t.paid_by_id || '',
+            date: t.date || '', createdBy: t.created_by || '', isDeleted: false
+          })));
+        } catch (e) {}
+        if (alive) setTimeout(poll, 1500);
+      };
+      poll();
+      return () => { alive = false; };
+    },
+    async addTx(hid, tx) {
+      const { error } = await client.from('transactions').insert({
+        household_id: hid, amount: Number(tx.amount) || 0, category: tx.category, note: tx.note,
+        paid_by: tx.paidBy, paid_by_id: tx.paidById, date: tx.date, created_by: tx.createdBy, is_deleted: false
+      });
+      if (error) throw error;
+    },
+    async delTx(hid, id) {
+      const { error } = await client.from('transactions').update({ is_deleted: true }).eq('id', id);
+      if (error) throw error;
+    },
+  };
+})();
+
+const S = { be: null, user: null, hh: null, txs: [], cat: '油费', authMode: 'signin', setupMode: 'create' };
+
+function show(name) {
+  ['auth', 'setup', 'main'].forEach(n => $('screen-' + n).classList.toggle('on', n === name));
+  window.__booted = true;
+  $('boot').hidden = true;
+  if (name === 'auth') {
+    // 退出/回到登录页时，默认切回「登录」标签，避免残留成「注册」导致点登录其实是注册
+    S.authMode = 'signin';
+    const seg = $('auth-seg');
+    if (seg) [...seg.children].forEach(x => x.classList.toggle('active', x.dataset.mode === 'signin'));
+    const fn = $('f-name'); if (fn) fn.hidden = true;
+    const ba = $('btn-auth'); if (ba) ba.textContent = '登录';
+    const ah = $('auth-hint'); if (ah) ah.textContent = '还没有账号？点上面的「注册」先建一个';
+    const ae = $('auth-err'); if (ae) ae.hidden = true;
+  }
+}
+
+function bootFail(msg) {
+  const boot = $('boot');
+  if (boot) boot.hidden = false;
+  const t = $('boot-text'), b = $('boot-err');
+  if (t) t.textContent = '启动失败';
+  if (b) { b.hidden = false; b.textContent = msg; }
+}
+
+async function boot() {
+  const cfg = FIREBASE_CONFIG || {};
+  const ready = cfg.apiKey && cfg.appId && cfg.projectId;
+  const isFile = location.protocol === 'file:';
+  const hasSDK = typeof firebase !== 'undefined';
+  let note = '';
+
+  // 优先：Supabase（数据永久保存，重部署不丢）。配置好且 SDK 已加载才启用。
+  const sb = SUPABASE_CONFIG || {};
+  const sbReady = sb.url && sb.anonKey && typeof supabase !== 'undefined';
+  if (sbReady) {
+    try {
+      await SupabaseBE.init();
+      S.be = SupabaseBE;
+      note = '已连接 Supabase 云端：数据永久保存，两台手机随时随地同步，重部署也不丢。';
+    } catch (e) {
+      console.warn('Supabase 初始化失败，尝试其他模式', e);
+    }
+  }
+
+  const cloud = CLOUD_CONFIG || {};
+  const cloudReady = cloud.appId && cloud.appKey && cloud.serverURL;
+  if (cloudReady && typeof AV !== 'undefined') {
+    try {
+      await LeanCloud.init(cloud);
+      S.be = LeanCloud;
+      note = '已连接云端（LeanCloud）：两台手机随时随地同步，无需家里电脑。';
+    } catch (e) {
+      console.warn('LeanCloud 初始化失败，转入其他模式', e);
+    }
+  }
+
+  if (!S.be && ready && !isFile && hasSDK) {
+    try {
+      firebase.initializeApp(cfg);
+      const auth = firebase.auth();
+      const db = firebase.firestore();
+      try { auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch (e) {}
+      let unsub = null;
+      S.be = {
+        isDemo: false,
+        onAuth(cb) {
+          auth.onAuthStateChanged(async fu => {
+            if (!fu) return cb(null);
+            let prof = {};
+            try { const s = await db.collection('users').doc(fu.uid).get(); if (s.exists()) prof = s.data(); } catch (e) {}
+            cb({ uid: fu.uid, email: fu.email, displayName: prof.displayName || (fu.email || '').split('@')[0], householdId: prof.householdId || '' });
+          });
+        },
+        async signUp(email, pass, name) {
+          const r = await auth.createUserWithEmailAndPassword(email, pass);
+          await db.collection('users').doc(r.user.uid).set({ email, displayName: name, householdId: '', createdAt: firebase.firestore.Timestamp.now() });
+        },
+        async signIn(email, pass) { await auth.signInWithEmailAndPassword(email, pass); },
+        async signOut() { if (unsub) { unsub(); unsub = null; } await auth.signOut(); },
+        async createHousehold(uid, name, myName) {
+          const ref = db.collection('households').doc();
+          await ref.set({ name, inviteCode: makeCode(), members: [uid], memberProfiles: { [uid]: myName }, createdAt: firebase.firestore.Timestamp.now() });
+          await db.collection('users').doc(uid).set({ householdId: ref.id }, { merge: true });
+          return ref.id;
+        },
+        async joinHousehold(uid, code, myName) {
+          const snap = await db.collection('households').where('inviteCode', '==', code).get();
+          if (snap.empty) throw new Error('邀请码无效，请确认后重试');
+          const hid = snap.docs[0].id;
+          await db.collection('households').doc(hid).update({ members: firebase.firestore.FieldValue.arrayUnion(uid), [`memberProfiles.${uid}`]: myName });
+          await db.collection('users').doc(uid).set({ householdId: hid }, { merge: true });
+          return hid;
+        },
+        async getHousehold(hid) { const s = await db.collection('households').doc(hid).get(); return s.exists ? { id: hid, ...s.data() } : null; },
+        watchTx(hid, cb) {
+          if (unsub) unsub();
+          unsub = db.collection('households').doc(hid).collection('transactions').onSnapshot(snap => {
+            const out = [];
+            snap.forEach(d => { const v = d.data(); if (v.isDeleted) return; out.push({ id: d.id, amount: Number(v.amount) || 0, category: v.category || '其他', note: v.note || '', paidBy: v.paidBy || '', paidById: v.paidById || '', date: v.date && v.date.toDate ? ymd(v.date.toDate()) : (v.date || ''), isDeleted: false }); });
+            cb(out);
+          }, err => toast(zhError(err)));
+        },
+        async addTx(hid, tx) {
+          const [y, m, d] = tx.date.split('-').map(Number);
+          await db.collection('households').doc(hid).collection('transactions').add({ amount: tx.amount, category: tx.category, note: tx.note, date: firebase.firestore.Timestamp.fromDate(new Date(y, m - 1, d, 12, 0, 0)), paidBy: tx.paidBy, paidById: tx.paidById, createdBy: tx.createdBy, createdAt: firebase.firestore.Timestamp.now(), isDeleted: false });
+        },
+        async delTx(hid, id) { await db.collection('households').doc(hid).collection('transactions').doc(id).update({ isDeleted: true }); },
+      };
+      note = '已连接云端，两台手机实时同步。';
+    } catch (e) {
+      console.warn('Firebase 初始化失败，转入演示模式', e);
+      S.be = Demo;
+      note = '云端连接失败，已转为本地演示模式（数据只存本机）。';
+    }
+  } else if (!S.be) {
+    if (!isFile) {
+      try {
+        const p = await fetch('/api/ping');
+        if (p.ok) {
+          S.be = LocalAPI;
+          note = '已连接在线服务器：两台手机随时随地共用一本账，数据保存在云端服务器上。';
+        } else {
+          throw new Error('no');
+        }
+      } catch (e) {
+        S.be = Demo;
+        note = ready ? '云端库未加载，已转为本地演示模式（数据只存本机）。'
+                     : '当前为本地演示模式：数据只保存在这台设备的浏览器里，不会同步给家人。';
+      }
+    } else {
+      S.be = Demo;
+      if (ready) note = '云端配置已就位，但当前是「双击本地文件」打开的，浏览器不允许在这种方式下联网登录，所以先按演示模式运行。用网址（http）打开即可联网同步。';
+      else note = '当前为本地演示模式：数据只保存在这台设备的浏览器里。';
+    }
+  }
+  const mn = $('mode-note'); if (mn) mn.textContent = note;
+
+  wire();
+
+  S.be.onAuth(async u => {
+    try {
+      S.user = u;
+      if (!u) { S.hh = null; S.txs = []; show('auth'); return; }
+      if (!u.householdId) { show('setup'); return; }
+      S.hh = await S.be.getHousehold(u.householdId);
+      if (!S.hh) { show('setup'); return; }
+      renderSettings();
+      S.be.watchTx(S.hh.id, list => { S.txs = list; renderAll(); });
+      show('main');
+    } catch (e) {
+      console.error(e);
+      show('auth');
+      toast(zhError(e));
+    }
+  });
+}
+
+function start() {
+  try {
+    boot().catch(e => { console.error(e); bootFail('启动出错：' + (e && e.message ? e.message : e)); });
+  } catch (e) {
+    console.error(e);
+    bootFail('启动出错：' + (e && e.message ? e.message : e));
+  }
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+else start();
+
+function wire() {
+  $('auth-seg').addEventListener('click', e => {
+    const b = e.target.closest('.seg-btn'); if (!b) return;
+    S.authMode = b.dataset.mode;
+    [...$('auth-seg').children].forEach(x => x.classList.toggle('active', x === b));
+    const up = S.authMode === 'signup';
+    $('f-name').hidden = !up;
+    $('btn-auth').textContent = up ? '注册并开始' : '登录';
+    $('auth-hint').textContent = up ? '邮箱只用来登录，不会发任何邮件' : '还没有账号？点上面的「注册」先建一个';
+    $('auth-err').hidden = true;
+  });
+
+  $('btn-auth').addEventListener('click', async () => {
+    const email = $('in-email').value.trim();
+    const pass = $('in-pass').value;
+    const name = $('in-name').value.trim();
+    const err = $('auth-err');
+    err.hidden = true;
+    if (!email || !pass) { err.textContent = '邮箱和密码都要填'; err.hidden = false; return; }
+    if (S.authMode === 'signup' && !name) { err.textContent = '填一下你的称呼，记账时要显示'; err.hidden = false; return; }
+    $('btn-auth').disabled = true;
+    $('btn-auth').textContent = '请稍候…';
+    try {
+      if (S.authMode === 'signup') await S.be.signUp(email, pass, name);
+      else await S.be.signIn(email, pass);
+    } catch (e) { err.textContent = zhError(e); err.hidden = false; }
+    $('btn-auth').disabled = false;
+    $('btn-auth').textContent = S.authMode === 'signup' ? '注册并开始' : '登录';
+  });
+
+  $('setup-seg').addEventListener('click', e => {
+    const b = e.target.closest('.seg-btn'); if (!b) return;
+    S.setupMode = b.dataset.mode;
+    [...$('setup-seg').children].forEach(x => x.classList.toggle('active', x === b));
+    $('setup-create').hidden = S.setupMode !== 'create';
+    $('setup-join').hidden = S.setupMode !== 'join';
+    $('setup-err').hidden = true;
+  });
+
+  $('btn-create').addEventListener('click', async () => {
+    const name = $('in-hname').value.trim() || '我们的旅行账本';
+    try {
+      const hid = await S.be.createHousehold(S.user.uid, name, S.user.displayName);
+      S.user.householdId = hid;
+      S.hh = await S.be.getHousehold(hid);
+      renderSettings();
+      S.be.watchTx(hid, l => { S.txs = l; renderAll(); });
+      show('main');
+      toast('账本已创建，邀请码 ' + S.hh.inviteCode);
+    } catch (e) { $('setup-err').textContent = zhError(e); $('setup-err').hidden = false; }
+  });
+
+  $('btn-join').addEventListener('click', async () => {
+    const code = $('in-code').value.trim().toUpperCase();
+    if (code.length !== 6) { $('setup-err').textContent = '邀请码是 6 位'; $('setup-err').hidden = false; return; }
+    try {
+      const hid = await S.be.joinHousehold(S.user.uid, code, S.user.displayName);
+      S.user.householdId = hid;
+      S.hh = await S.be.getHousehold(hid);
+      renderSettings();
+      S.be.watchTx(hid, l => { S.txs = l; renderAll(); });
+      show('main');
+      toast('已加入「' + S.hh.name + '」');
+    } catch (e) { $('setup-err').textContent = zhError(e); $('setup-err').hidden = false; }
+  });
+
+  const out = async () => { await S.be.signOut(); show('auth'); };
+  $('btn-logout').addEventListener('click', out);
+  $('btn-logout-setup').addEventListener('click', out);
+
+  document.querySelector('.tabbar').addEventListener('click', e => {
+    const b = e.target.closest('.tab'); if (!b) return;
+    document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === b));
+    ['summary', 'list', 'settings'].forEach(p => { $('pane-' + p).hidden = p !== b.dataset.pane; });
+    $('btn-add').style.display = b.dataset.pane === 'settings' ? 'none' : '';
+  });
+
+  $('btn-copy').addEventListener('click', async () => {
+    const code = S.hh ? S.hh.inviteCode : '';
+    try { await navigator.clipboard.writeText(code); toast('邀请码 ' + code + ' 已复制'); }
+    catch (e) { toast('邀请码：' + code); }
+  });
+
+  $('btn-export').addEventListener('click', exportBackup);
+  $('btn-import').addEventListener('click', () => $('file-import').click());
+  $('file-import').addEventListener('change', importBackup);
+
+  const grid = $('cat-grid');
+  CATS.forEach(c => { const b = document.createElement('button'); b.className = 'cat-btn'; b.textContent = c.name; b.dataset.name = c.name; grid.appendChild(b); });
+  grid.addEventListener('click', e => { const b = e.target.closest('.cat-btn'); if (!b) return; S.cat = b.dataset.name; paintCatBtns(); });
+
+  $('btn-add').addEventListener('click', openSheet);
+  $('btn-cancel').addEventListener('click', closeSheet);
+  $('sheet-mask').addEventListener('click', closeSheet);
+  $('btn-save').addEventListener('click', saveTx);
+}
+
+function paintCatBtns() {
+  document.querySelectorAll('.cat-btn').forEach(b => {
+    const on = b.dataset.name === S.cat;
+    b.classList.toggle('sel', on);
+    b.style.background = on ? catColor(b.dataset.name) : '';
+  });
+}
+
+function openSheet() {
+  $('in-amount').value = '';
+  $('in-note').value = '';
+  $('in-date').value = ymd(new Date());
+  $('add-err').hidden = true;
+  S.cat = '油费'; paintCatBtns();
+  const sel = $('in-payer');
+  sel.innerHTML = '';
+  const profs = (S.hh && S.hh.memberProfiles) || {};
+  const ids = Object.keys(profs).length ? Object.keys(profs) : [S.user.uid];
+  ids.forEach(uid => {
+    const o = document.createElement('option');
+    o.value = uid; o.textContent = profs[uid] || (uid === S.user.uid ? S.user.displayName : '家人');
+    sel.appendChild(o);
+  });
+  sel.value = S.user.uid;
+  $('sheet-mask').hidden = false;
+  $('sheet-add').hidden = false;
+  setTimeout(() => $('in-amount').focus(), 120);
+}
+function closeSheet() { $('sheet-mask').hidden = true; $('sheet-add').hidden = true; }
+
+async function saveTx() {
+  const amt = parseFloat($('in-amount').value);
+  const err = $('add-err');
+  if (!amt || amt <= 0) { err.textContent = '金额要填一个大于 0 的数'; err.hidden = false; return; }
+  const payerId = $('in-payer').value;
+  const profs = (S.hh && S.hh.memberProfiles) || {};
+  const tx = {
+    amount: amt, category: S.cat,
+    note: $('in-note').value.trim() || S.cat,
+    date: $('in-date').value || ymd(new Date()),
+    paidBy: profs[payerId] || S.user.displayName,
+    paidById: payerId, createdBy: S.user.uid, isDeleted: false,
+  };
+  $('btn-save').disabled = true;
+  try { await S.be.addTx(S.hh.id, tx); closeSheet(); toast('已记 ¥' + money0(amt)); }
+  catch (e) { err.textContent = zhError(e); err.hidden = false; }
+  $('btn-save').disabled = false;
+}
+
+async function delTx(id, note) {
+  if (!confirm('删除这笔「' + note + '」？')) return;
+  try { await S.be.delTx(S.hh.id, id); toast('已删除'); }
+  catch (e) { toast(zhError(e)); }
+}
+
+function renderAll() { renderTop(); renderSummary(); renderList(); }
+
+/* 导出/导入备份：直接基于内存里的 S.txs 与通用 addTx，任何后端都能用 */
+async function exportBackup() {
+  if (!S.hh) { toast('请先创建或加入一个账本'); return; }
+  const data = {
+    app: 'family-ledger', version: 1,
+    exportedAt: new Date().toISOString(),
+    household: { id: S.hh.id, name: S.hh.name, inviteCode: S.hh.inviteCode },
+    transactions: S.txs || []
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  const d = new Date();
+  const ds = d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2);
+  a.href = URL.createObjectURL(blob);
+  a.download = '家庭记账备份-' + ds + '.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(a.href);
+  toast('已导出 ' + (S.txs || []).length + ' 笔到手机');
+}
+
+async function importBackup(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  if (!S.hh) { toast('请先创建或加入一个账本再恢复'); e.target.value = ''; return; }
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    const txs = Array.isArray(data.transactions) ? data.transactions : [];
+    let n = 0;
+    for (const tx of txs) {
+      if (!tx || typeof tx.amount !== 'number') continue;
+      await S.be.addTx(S.hh.id, {
+        amount: Number(tx.amount),
+        category: tx.category || '其他',
+        note: tx.note || '',
+        paidBy: tx.paidBy || '',
+        paidById: tx.paidById || '',
+        date: tx.date || new Date().toISOString().slice(0, 10),
+        createdBy: tx.createdBy || (S.user && S.user.uid) || ''
+      });
+      n++;
+    }
+    toast('已恢复 ' + n + ' 笔');
+  } catch (err) {
+    toast('恢复失败：' + (err && err.message ? err.message : err));
+  } finally {
+    e.target.value = '';
+  }
+}
+
+function renderTop() {
+  const total = S.txs.reduce((s, t) => s + t.amount, 0);
+  $('hh-name').textContent = S.hh ? S.hh.name : '账本';
+  $('hh-total').textContent = money0(total);
+  $('hh-sub').textContent = `共 ${S.txs.length} 笔支出`;
+}
+
+function renderSummary() {
+  const total = S.txs.reduce((s, t) => s + t.amount, 0);
+  const cm = {};
+  S.txs.forEach(t => { cm[t.category] = (cm[t.category] || 0) + t.amount; });
+  const rows = CATS.filter(c => cm[c.name]).sort((a, b) => cm[b.name] - cm[a.name]);
+  $('cat-list').innerHTML = rows.length ? rows.map(c => {
+    const v = cm[c.name], p = total ? Math.round(v / total * 100) : 0;
+    return `<div class="cat-row"><span class="dot" style="background:${c.color}"></span><span class="cat-name">${c.name}</span><span class="bar"><span class="bar-fill" style="width:${Math.max(p, 2)}%;background:${c.color}"></span></span><span class="cat-amt">¥${money0(v)}</span><span class="cat-pct">${p}%</span></div>`;
+  }).join('') : '<div class="empty">还没有记录</div>';
+
+  const pm = {};
+  S.txs.forEach(t => { pm[t.paidBy || '未知'] = (pm[t.paidBy || '未知'] || 0) + t.amount; });
+  const ps = Object.entries(pm).sort((a, b) => b[1] - a[1]);
+  $('person-list').innerHTML = ps.length ? ps.map(([n, v]) => `<div class="row"><span class="row-k">${n}</span><span class="row-v">¥${money0(v)}</span></div>`).join('') : '<div class="empty">还没有记录</div>';
+
+  const box = $('settle-list');
+  const names = Object.keys(pm);
+  if (!names.length) { box.innerHTML = '<div class="empty">还没有记录</div>'; return; }
+  if (names.length === 1) { box.innerHTML = `<div class="settle-ok">目前只有 ${names[0]} 一个人付过钱，等家人也记账后这里会算出该怎么平账</div>`; return; }
+  const avg = total / names.length;
+  const bal = names.map(n => ({ n, d: pm[n] - avg })).sort((a, b) => a.d - b.d);
+  const debt = bal.filter(x => x.d < -0.005).map(x => ({ ...x }));
+  const cred = bal.filter(x => x.d > 0.005).map(x => ({ ...x })).reverse();
+  const lines = [`<div class="settle-line" style="color:var(--muted)">总支出 ¥${money0(total)}，${names.length} 人均摊每人 ¥${money(avg)}</div>`];
+  let i = 0, j = 0;
+  while (i < debt.length && j < cred.length) {
+    const pay = Math.min(-debt[i].d, cred[j].d);
+    if (pay > 0.005) lines.push(`<div class="settle-line"><b>${debt[i].n}</b> 应付给 <b>${cred[j].n}</b> ¥${money(pay)}</div>`);
+    debt[i].d += pay; cred[j].d -= pay;
+    if (-debt[i].d < 0.005) i++;
+    if (cred[j].d < 0.005) j++;
+  }
+  if (lines.length === 1) lines.push('<div class="settle-ok">已经平了，谁也不欠谁</div>');
+  box.innerHTML = lines.join('');
+}
+
+function dayLabel(s) {
+  const t = new Date(); const y = new Date(Date.now() - 86400000);
+  if (s === ymd(t)) return '今天';
+  if (s === ymd(y)) return '昨天';
+  const [Y, M, D] = s.split('-').map(Number);
+  const w = ['日', '一', '二', '三', '四', '五', '六'][new Date(Y, M - 1, D).getDay()];
+  return `${M}月${D}日 周${w}`;
+}
+
+function renderList() {
+  const wrap = $('tx-groups');
+  if (!S.txs.length) { wrap.innerHTML = ''; $('tx-empty').hidden = false; return; }
+  $('tx-empty').hidden = true;
+  const g = {};
+  S.txs.forEach(t => { (g[t.date] = g[t.date] || []).push(t); });
+  const days = Object.keys(g).sort().reverse();
+  wrap.innerHTML = days.map(d => {
+    const sum = g[d].reduce((s, t) => s + t.amount, 0);
+    const items = g[d].map(t => `
+      <div class="tx">
+        <span class="tx-ico" style="background:${catColor(t.category)}">${t.category.slice(0, 1)}</span>
+        <span class="tx-mid">
+          <div class="tx-note">${escapeHtml(t.note)}</div>
+          <div class="tx-meta">${t.category} · ${escapeHtml(t.paidBy || '')}付</div>
+        </span>
+        <span class="tx-amt">¥${money0(t.amount)}</span>
+        <button class="tx-del" data-id="${t.id}" data-note="${escapeAttr(t.note)}">×</button>
+      </div>`).join('');
+    return `<div class="day"><div class="day-head"><span>${dayLabel(d)}</span><span>¥${money0(sum)}</span></div>${items}</div>`;
+  }).join('');
+  wrap.querySelectorAll('.tx-del').forEach(b => b.addEventListener('click', () => delTx(b.dataset.id, b.dataset.note)));
+}
+
+function renderSettings() {
+  if (!S.hh) return;
+  $('set-hname').textContent = S.hh.name;
+  $('set-code').textContent = S.hh.inviteCode;
+  $('set-name').textContent = S.user.displayName || '—';
+  $('set-email').textContent = S.user.email || '—';
+}
+
+const escapeHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const escapeAttr = s => escapeHtml(s).replace(/'/g, '&#39;');
+</script>
+</body>
+</html>
