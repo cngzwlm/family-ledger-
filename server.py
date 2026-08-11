@@ -169,6 +169,51 @@ def _restore_loop():
             return
         time.sleep(20)
     _restored = True  # 重试耗尽（如持续网络错误）也视为恢复阶段结束
+    # 恢复阶段结束：若已配置 token，立即创建初始文件（无需先发生交易）
+    if GH_TOKEN:
+        try:
+            r = _do_github_push()
+            _record_sync(r)
+        except Exception:
+            pass
+
+_last_sync = {"attempts": 0, "last_ok": None, "last_error": None}
+
+def _record_sync(r):
+    global _last_sync
+    _last_sync = {"attempts": _last_sync.get("attempts", 0) + 1,
+                  "last_ok": r.get("ok"),
+                  "last_error": None if r.get("ok") else r}
+
+def _do_github_push():
+    """真实向 GitHub 写入一次，返回 dict 结果（供后台同步与诊断共用）。"""
+    url = _gh_url()
+    sha = None
+    try:
+        req = urllib.request.Request(url, headers=_gh_headers())
+        resp = urllib.request.urlopen(req, timeout=20)
+        sha = json.loads(resp.read()).get("sha")
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            return {"ok": False, "stage": "get", "code": e.code,
+                    "detail": e.read().decode("utf-8", "ignore")[:500]}
+    except Exception as e:
+        return {"ok": False, "stage": "get", "code": 0, "detail": str(e)[:500]}
+    content = base64.b64encode(json.dumps(DATA, ensure_ascii=False).encode("utf-8")).decode("utf-8")
+    body = {"message": "ledger sync", "content": content}
+    if sha:
+        body["sha"] = sha
+    try:
+        req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"),
+                                     headers=_gh_headers({"Content-Type": "application/json"}),
+                                     method="PUT")
+        urllib.request.urlopen(req, timeout=20)
+        return {"ok": True}
+    except urllib.error.HTTPError as e:
+        return {"ok": False, "stage": "put", "code": e.code,
+                "detail": e.read().decode("utf-8", "ignore")[:500]}
+    except Exception as e:
+        return {"ok": False, "stage": "put", "code": 0, "detail": str(e)[:500]}
 
 def sync_to_github():
     global _restored
@@ -181,35 +226,12 @@ def sync_to_github():
         time.sleep(2.5)
     if not _restored:
         return
-    for attempt in range(3):
-        try:
-            url = _gh_url()
-            sha = None
-            try:
-                req = urllib.request.Request(url, headers=_gh_headers())
-                resp = urllib.request.urlopen(req, timeout=20)
-                sha = json.loads(resp.read()).get("sha")
-            except urllib.error.HTTPError as e:
-                if e.code != 404:
-                    pass
-            content = base64.b64encode(json.dumps(DATA, ensure_ascii=False).encode("utf-8")).decode("utf-8")
-            body = {"message": "ledger sync", "content": content}
-            if sha:
-                body["sha"] = sha
-            req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"),
-                                         headers=_gh_headers({"Content-Type": "application/json"}),
-                                         method="PUT")
-            urllib.request.urlopen(req, timeout=20)
-            print("[github] 已同步到 GitHub")
-            return
-        except urllib.error.HTTPError as e:
-            if e.code in (409, 422) and attempt < 2:
-                continue  # sha 冲突，重试
-            print("[github] 同步失败(忽略):", e)
-            return
-        except Exception as e:
-            print("[github] 同步失败(忽略):", e)
-            return
+    r = _do_github_push()
+    _record_sync(r)
+    if r.get("ok"):
+        print("[github] 已同步到 GitHub")
+    else:
+        print("[github] 同步失败:", r)
 
 # ─────────────── 核心分发（http.server 与 WSGI 共用） ───────────────
 def dispatch(method, path, query, headers, body):
@@ -227,6 +249,8 @@ def dispatch(method, path, query, headers, body):
         return _resp(200, {"ok": True})
 
     if p == "/api/debug":
+        # 当场真实试写一次 GitHub（同时会创建初始文件），把原始错误直接返回
+        test = _do_github_push() if GH_TOKEN else {"ok": False, "error": "no_token"}
         return _resp(200, {
             "version": "github-persist",
             "github_configured": bool(GH_TOKEN),
@@ -234,6 +258,8 @@ def dispatch(method, path, query, headers, body):
             "restored": _restored,
             "repo": GH_REPO,
             "file": GH_PATH,
+            "sync_test": test,
+            "last_sync": _last_sync,
         })
 
     if p == "/api/force_sync":
