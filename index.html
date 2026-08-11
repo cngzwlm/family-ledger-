@@ -850,17 +850,17 @@ async function boot() {
   const hasSDK = typeof firebase !== 'undefined';
   let note = '';
 
-  // 优先：Supabase（数据永久保存，重部署不丢）。配置好且 SDK 已加载才启用。
-  const sb = SUPABASE_CONFIG || {};
-  const sbReady = sb.url && sb.anonKey && typeof supabase !== 'undefined';
-  if (sbReady) {
+  // 优先：在线服务器（Render）。两台手机经它实时同步；数据由服务器持久化到 GitHub，重部署/重启不丢。
+  let onlineOK = false;
+  if (!isFile) {
     try {
-      await SupabaseBE.init();
-      S.be = SupabaseBE;
-      note = '已连接 Supabase 云端：数据永久保存，两台手机随时随地同步，重部署也不丢。';
-    } catch (e) {
-      console.warn('Supabase 初始化失败，尝试其他模式', e);
-    }
+      const p = await fetch('/api/ping');
+      onlineOK = p.ok;
+    } catch (e) {}
+  }
+  if (onlineOK) {
+    S.be = LocalAPI;
+    note = '已连接在线服务器：两台手机随时随地共用一本账，数据永久保存在 GitHub 云端，重部署也不丢。';
   }
 
   const cloud = CLOUD_CONFIG || {};

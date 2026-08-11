@@ -8,6 +8,7 @@
 #   2) 托管平台(如 PythonAnywhere)：平台加载本文件的 wsgi_app 作为 WSGI 应用
 import json
 import os
+import time
 import hashlib
 import secrets
 import threading
@@ -15,7 +16,7 @@ import random
 import string
 import urllib.request
 import urllib.error
-from urllib.parse import urlparse, parse_qs, urlencode
+from urllib.parse import urlparse, parse_qs
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -34,6 +35,11 @@ def save(d):
     tmp = DB + ".tmp"
     json.dump(d, open(tmp, "w", encoding="utf-8"), ensure_ascii=False)
     os.replace(tmp, DB)
+    if GH_TOKEN:
+        try:
+            threading.Thread(target=sync_to_github, daemon=True).start()
+        except Exception:
+            pass
 
 DATA = load()
 
@@ -100,79 +106,106 @@ def serve_static(path):
                  "Access-Control-Allow-Origin": "*",
                  "Content-Length": str(len(data))}, data
 
-# ─────────────── Supabase 反向代理（绕过 supabase.co 在部分地区的网络限制） ───────────────
-# 浏览器只与本服务器通信（同源，走 Render，国内可访问），由本服务器转发到 Supabase。
-# 仅转发到固定的 Supabase 项目，使用前端已公开的 anon key；RLS 仍由用户 JWT 保证，不会越权。
-SUPABASE_TARGET = "https://jrjigmgutrsjesmqvyzg.supabase.co"
+# ─────────────── GitHub 持久化（数据镜像到 GitHub 仓库文件，重启不丢） ───────────────
+# 浏览器只与本服务器通信（同源，走 Render，国内可访问）；本服务器把账本实时同步到 GitHub 仓库文件。
+# 需配置环境变量：GITHUB_TOKEN(有 repo 权限的 PAT)、GITHUB_REPO(owner/repo)、GITHUB_FILE(文件名)。
+# 未配置时自动降级为仅内存+本地磁盘（重启会丢），不影响正常使用。
+import base64
+GH_TOKEN = os.environ.get("GITHUB_TOKEN", "")
+GH_REPO = os.environ.get("GITHUB_REPO", "cngzwlm/family-ledger")
+GH_PATH = os.environ.get("GITHUB_FILE", "ledger_data.json")
 
-# 临时诊断白名单：仅用于排查 Render 外网连通性，生产请求不带该头，始终走 Supabase
-_PROXY_ALLOW = {
-    "supabase": "https://jrjigmgutrsjesmqvyzg.supabase.co",
-    "github": "https://api.github.com",
-    "google": "https://www.google.com",
-}
+# 恢复完成标志：只有从 GitHub 成功恢复后，才允许向 GitHub 写，避免启动未完成时清掉已有数据
+_restored = False
 
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
+def _gh_headers(extra=None):
+    h = {"Accept": "application/vnd.github+json", "User-Agent": "family-ledger",
+         "X-GitHub-Api-Version": "2022-11-28"}
+    if GH_TOKEN:
+        h["Authorization"] = "Bearer " + GH_TOKEN
+    if extra:
+        h.update(extra)
+    return h
 
-_opener = urllib.request.build_opener(_NoRedirect())
+def _gh_url():
+    return "https://api.github.com/repos/%s/contents/%s" % (GH_REPO, GH_PATH)
 
-def _proxy_supabase(method, subpath, query, headers, body, base=None):
-    target_base = base or SUPABASE_TARGET
-    target = target_base.rstrip("/") + "/" + subpath.lstrip("/")
-    qs = urlencode(query, doseq=True) if query else ""
-    if qs:
-        target += "?" + qs
-    # 复制请求头，去掉逐跳头，避免 Content-Length / Accept-Encoding 引发压缩或长度错乱
-    req_headers = {}
-    for k, v in headers.items():
-        if k.lower() in ("host", "content-length", "connection", "transfer-encoding", "accept-encoding"):
-            continue
-        req_headers[k] = v
-    data = body if method in ("POST", "PUT", "PATCH", "DELETE") else None
-    req = urllib.request.Request(target, data=data, method=method)
-    for k, v in req_headers.items():
-        try:
-            req.add_header(k, v)
-        except Exception:
-            pass
+def restore_from_github():
+    global _restored
+    if not GH_TOKEN:
+        return False
     try:
-        resp = _opener.open(req, timeout=30)
-        code = resp.getcode()
-        resp_body = resp.read()
-        resp_headers = {}
-        ct = resp.headers.get("Content-Type")
-        if ct:
-            resp_headers["Content-Type"] = ct
-        return code, resp_headers, resp_body
+        req = urllib.request.Request(_gh_url(), headers=_gh_headers())
+        resp = urllib.request.urlopen(req, timeout=10)
+        j = json.loads(resp.read())
+        raw = base64.b64decode(j.get("content", "")).decode("utf-8")
+        remote = json.loads(raw)
+        with LOCK:
+            for k in ("users", "households", "txns", "tokens"):
+                if k in remote and isinstance(remote[k], dict):
+                    DATA[k] = remote[k]
+            save(DATA)
+        _restored = True
+        print("[github] 已从 GitHub 恢复数据")
+        return True
     except urllib.error.HTTPError as e:
-        code = e.code
-        try:
-            resp_body = e.read()
-        except Exception:
-            resp_body = b""
-        resp_headers = {}
-        ct = e.headers.get("Content-Type") if e.headers else None
-        if ct:
-            resp_headers["Content-Type"] = ct
-        return code, resp_headers, resp_body
+        if e.code == 404:
+            print("[github] 仓库中尚无数据文件，将在首次变更后创建")
+            return False
+        print("[github] 恢复失败(忽略):", e)
+        return False
     except Exception as e:
-        return 502, {"Content-Type": "application/json"}, \
-            json.dumps({"error": "supabase_proxy_failed", "detail": str(e)}, ensure_ascii=False).encode("utf-8")
+        print("[github] 恢复失败(忽略):", e)
+        return False
+
+def _restore_loop():
+    """后台重试恢复，直到成功或明确无 token；不在主线程阻塞启动。"""
+    global _restored
+    for i in range(12):
+        if _restored or not GH_TOKEN:
+            return
+        if restore_from_github():
+            return
+        time.sleep(20)
+
+def sync_to_github():
+    global _restored
+    if not GH_TOKEN or not _restored:
+        return
+    for attempt in range(3):
+        try:
+            url = _gh_url()
+            sha = None
+            try:
+                req = urllib.request.Request(url, headers=_gh_headers())
+                resp = urllib.request.urlopen(req, timeout=20)
+                sha = json.loads(resp.read()).get("sha")
+            except urllib.error.HTTPError as e:
+                if e.code != 404:
+                    pass
+            content = base64.b64encode(json.dumps(DATA, ensure_ascii=False).encode("utf-8")).decode("utf-8")
+            body = {"message": "ledger sync", "content": content}
+            if sha:
+                body["sha"] = sha
+            req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"),
+                                         headers=_gh_headers({"Content-Type": "application/json"}),
+                                         method="PUT")
+            urllib.request.urlopen(req, timeout=20)
+            print("[github] 已同步到 GitHub")
+            return
+        except urllib.error.HTTPError as e:
+            if e.code in (409, 422) and attempt < 2:
+                continue  # sha 冲突，重试
+            print("[github] 同步失败(忽略):", e)
+            return
+        except Exception as e:
+            print("[github] 同步失败(忽略):", e)
+            return
 
 # ─────────────── 核心分发（http.server 与 WSGI 共用） ───────────────
 def dispatch(method, path, query, headers, body):
     method = (method or "GET").upper()
     p = path.split("?")[0]
-
-    # Supabase 反向代理：把 /sb/... 转发到 Supabase，绕过 supabase.co 在部分地区的网络限制
-    if p.startswith("/sb/"):
-        base = None
-        t = (headers.get("X-Proxy-Test") or "").strip().lower()
-        if t in _PROXY_ALLOW:
-            base = _PROXY_ALLOW[t]
-        return _proxy_supabase(method, p[len("/sb/"):], query, headers, body, base=base)
 
     if method == "OPTIONS":
         return 204, {
@@ -382,6 +415,12 @@ def wsgi_app(environ, start_response):
     status = "%d %s" % (code, STATUS_TEXT.get(code, ""))
     start_response(status, [(k, str(v)) for k, v in resp_headers.items()])
     return [body_bytes]
+
+# 启动前：后台非阻塞地从 GitHub 恢复数据（恢复成功前不会向 GitHub 写，避免清掉已有数据）
+try:
+    threading.Thread(target=_restore_loop, daemon=True).start()
+except Exception as e:
+    print("[github] 启动恢复线程失败(忽略):", e)
 
 if __name__ == "__main__":
     PORT = int(os.environ.get("PORT", "8765"))
