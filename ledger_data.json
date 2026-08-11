@@ -1,1 +1,1 @@
-{"users": {}, "households": {}, "txns": {}, "tokens": {}}
+{"users": {"u8c45e29f2f11b088": {"uid": "u8c45e29f2f11b088", "email": "22853276@qq.com", "pass": "dafbf491fcb459ac20107c45f4c1a323c90ad93c285b9c7f914e20e69be28e2c", "displayName": "辜", "householdId": ""}}, "households": {}, "txns": {}, "tokens": {"30aaf45236ad65f851eed2634279f14e4145fad0154ce860": "u8c45e29f2f11b088"}}
