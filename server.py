@@ -105,14 +105,22 @@ def serve_static(path):
 # 仅转发到固定的 Supabase 项目，使用前端已公开的 anon key；RLS 仍由用户 JWT 保证，不会越权。
 SUPABASE_TARGET = "https://jrjigmgutrsjesmqvyzg.supabase.co"
 
+# 临时诊断白名单：仅用于排查 Render 外网连通性，生产请求不带该头，始终走 Supabase
+_PROXY_ALLOW = {
+    "supabase": "https://jrjigmgutrsjesmqvyzg.supabase.co",
+    "github": "https://api.github.com",
+    "google": "https://www.google.com",
+}
+
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
 
 _opener = urllib.request.build_opener(_NoRedirect())
 
-def _proxy_supabase(method, subpath, query, headers, body):
-    target = SUPABASE_TARGET.rstrip("/") + "/" + subpath.lstrip("/")
+def _proxy_supabase(method, subpath, query, headers, body, base=None):
+    target_base = base or SUPABASE_TARGET
+    target = target_base.rstrip("/") + "/" + subpath.lstrip("/")
     qs = urlencode(query, doseq=True) if query else ""
     if qs:
         target += "?" + qs
@@ -160,7 +168,11 @@ def dispatch(method, path, query, headers, body):
 
     # Supabase 反向代理：把 /sb/... 转发到 Supabase，绕过 supabase.co 在部分地区的网络限制
     if p.startswith("/sb/"):
-        return _proxy_supabase(method, p[len("/sb/"):], query, headers, body)
+        base = None
+        t = (headers.get("X-Proxy-Test") or "").strip().lower()
+        if t in _PROXY_ALLOW:
+            base = _PROXY_ALLOW[t]
+        return _proxy_supabase(method, p[len("/sb/"):], query, headers, body, base=base)
 
     if method == "OPTIONS":
         return 204, {
