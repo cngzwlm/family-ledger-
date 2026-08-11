@@ -226,6 +226,16 @@ def dispatch(method, path, query, headers, body):
     if p == "/api/ping":
         return _resp(200, {"ok": True})
 
+    if p == "/api/debug":
+        return _resp(200, {
+            "version": "github-persist",
+            "github_configured": bool(GH_TOKEN),
+            "github_token_len": len(GH_TOKEN),
+            "restored": _restored,
+            "repo": GH_REPO,
+            "file": GH_PATH,
+        })
+
     if method == "GET":
         if p == "/api/me":
             uid = _uid_from(headers)
