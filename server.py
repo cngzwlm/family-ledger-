@@ -130,6 +130,20 @@ def _gh_headers(extra=None):
 def _gh_url():
     return "https://api.github.com/repos/%s/contents/%s" % (GH_REPO, GH_PATH)
 
+def _gh_get_json(url):
+    """GET 一个 GitHub API 地址，返回 (code, dict)。用于诊断账号/仓库可达性。"""
+    try:
+        req = urllib.request.Request(url, headers=_gh_headers())
+        resp = urllib.request.urlopen(req, timeout=15)
+        return resp.getcode(), json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        try:
+            return e.code, json.loads(e.read().decode("utf-8", "ignore"))
+        except Exception:
+            return e.code, {}
+    except Exception as e:
+        return 0, {"error": str(e)}
+
 def restore_from_github():
     global _restored
     if not GH_TOKEN:
@@ -251,6 +265,12 @@ def dispatch(method, path, query, headers, body):
     if p == "/api/debug":
         # 当场真实试写一次 GitHub（同时会创建初始文件），把原始错误直接返回
         test = _do_github_push() if GH_TOKEN else {"ok": False, "error": "no_token"}
+        # 诊断：token 属于哪个账号、目标仓库是否可达
+        who = _gh_get_json("https://api.github.com/user")
+        repo_check = _gh_get_json("https://api.github.com/repos/%s" % GH_REPO)
+        whoami = who[1].get("login") if isinstance(who[1], dict) else None
+        repo_status = repo_check[0]
+        repo_full = repo_check[1].get("full_name") if isinstance(repo_check[1], dict) else None
         return _resp(200, {
             "version": "github-persist",
             "github_configured": bool(GH_TOKEN),
@@ -258,6 +278,9 @@ def dispatch(method, path, query, headers, body):
             "restored": _restored,
             "repo": GH_REPO,
             "file": GH_PATH,
+            "whoami": whoami,
+            "repo_status": repo_status,
+            "repo_full_name": repo_full,
             "sync_test": test,
             "last_sync": _last_sync,
         })
