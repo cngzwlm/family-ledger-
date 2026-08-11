@@ -271,6 +271,13 @@ def dispatch(method, path, query, headers, body):
         whoami = who[1].get("login") if isinstance(who[1], dict) else None
         repo_status = repo_check[0]
         repo_full = repo_check[1].get("full_name") if isinstance(repo_check[1], dict) else None
+        # 列出该账号下所有仓库名，帮助定位正确仓库名
+        repos_raw = _gh_get_json("https://api.github.com/user/repos?per_page=100&affiliation=owner")
+        repo_names = []
+        if isinstance(repos_raw[1], list):
+            for r in repos_raw[1]:
+                if isinstance(r, dict) and r.get("full_name"):
+                    repo_names.append(r["full_name"])
         return _resp(200, {
             "version": "github-persist",
             "github_configured": bool(GH_TOKEN),
@@ -281,6 +288,7 @@ def dispatch(method, path, query, headers, body):
             "whoami": whoami,
             "repo_status": repo_status,
             "repo_full_name": repo_full,
+            "your_repos": repo_names,
             "sync_test": test,
             "last_sync": _last_sync,
         })
