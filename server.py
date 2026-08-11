@@ -112,7 +112,7 @@ def serve_static(path):
 # 未配置时自动降级为仅内存+本地磁盘（重启会丢），不影响正常使用。
 import base64
 GH_TOKEN = os.environ.get("GITHUB_TOKEN", "")
-GH_REPO = os.environ.get("GITHUB_REPO", "cngzwlm/family-ledger")
+GH_REPO = os.environ.get("GITHUB_REPO", "cngzwlm/family-ledger-")
 GH_PATH = os.environ.get("GITHUB_FILE", "ledger_data.json")
 
 # 恢复完成标志：只有从 GitHub 成功恢复后，才允许向 GitHub 写，避免启动未完成时清掉已有数据
