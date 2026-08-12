@@ -376,7 +376,6 @@ window.addEventListener('DOMContentLoaded', function () {
   }, 2500);
 });
 </script>
-<script src="supabase.js"></script>
 <script>
 /* 兜底：无论如何，2 秒内必须让界面可见，绝不永远「正在加载」 */
 window.__booted = false;
@@ -422,17 +421,6 @@ const CLOUD_CONFIG = {
   serverURL: ""   // 例如 https://xxxx.api.lncldapi.com 或 https://xxxx.api.lncldglobal.com
 };
 
-/* ══════════ Supabase 云端配置（数据永久保存，不怕重部署，国内网络可达） ══════════
-   在 Supabase 控制台（项目 → Project Settings → API）复制下面两项填进来：
-   - url：Project URL，形如 https://xxxxxxxxxxxx.supabase.co
-   - anonKey：Project API keys 里的 anon public key（以 eyJ 开头的一长串）
-   填好后：① 把 supabase_schema.sql 的内容贴到 Supabase 的 SQL Editor 执行一次建表；
-           ② 重新部署到 Render。之后两台手机的数据就永久保存在 Supabase，重部署也不丢。
-   留空则维持原来的「本机服务器 / 演示」模式。 */
-const SUPABASE_CONFIG = {
-  url: "https://jrjigmgutrsjesmqvyzg.supabase.co",
-  anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpyamdpbWd1dHJzamVzbXF5eXpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NDkwOTAsImV4cCI6MjEwMjAyNTA5MH0.nPnrLpJmHHhu4DUa_KZ0YJxd1PZ8RML72Ar9DfBZJvU"
-};
 
 const CATS = [
   { name: '油费',   color: '#EF9F27' },
@@ -685,137 +673,6 @@ const LeanCloud = (() => {
   };
 })();
 
-/* ══════════ Supabase 云端后端（数据永久保存，国内可达，多设备实时同步） ══════════
-   表结构见 supabase_schema.sql（需在 Supabase SQL Editor 执行一次）。
-   账号用 Supabase 内置 Auth（邮箱+密码），账单用两张表：households / transactions。 */
-const SupabaseBE = (() => {
-  const cfg = SUPABASE_CONFIG || {};
-  let client = null;
-  let authCb = null;
-  const toUser = u => u ? ({
-    uid: u.id,
-    email: u.email || '',
-    displayName: (u.user_metadata && u.user_metadata.displayName) || (u.email || '').split('@')[0],
-    householdId: (u.user_metadata && u.user_metadata.householdId) || ''
-  }) : null;
-  const refresh = async () => { if (!authCb) return; const { data } = await client.auth.getUser(); authCb(toUser(data.user)); };
-  const setMeta = async (patch) => {
-    const { data } = await client.auth.updateUser({ data: patch });
-    if (authCb) authCb(toUser(data.user));
-    return toUser(data.user);
-  };
-  const meta = () => ({ displayName: S.user ? S.user.displayName : '', householdId: S.user ? S.user.householdId : '' });
-  return {
-    isDemo: false,
-    async init() {
-      if (typeof supabase === 'undefined') throw new Error('Supabase SDK 未加载');
-      // 反向代理：把对 supabase.co 的请求改写为同源的 /sb/，绕过部分地区对 supabase.co 的网络限制
-      const _orig = (globalThis.fetch || window.fetch).bind(globalThis);
-      const wrap = (input, init) => {
-        const rewrite = (u) => {
-          try {
-            const url = new URL(u, location.href);
-            if (url.hostname.endsWith('supabase.co')) {
-              return '/sb/' + url.pathname.replace(/^\//, '') + url.search + url.hash;
-            }
-          } catch (e) {}
-          return null;
-        };
-        if (typeof input === 'string') {
-          const np = rewrite(input);
-          return _orig(np || input, init);
-        }
-        if (input && typeof input.url === 'string') {
-          const np = rewrite(input.url);
-          if (np) return _orig(new Request(np, input), init);
-          return _orig(input, init);
-        }
-        return _orig(input, init);
-      };
-      globalThis.fetch = wrap;
-      if (window.fetch) window.fetch = wrap;
-      client = supabase.createClient(cfg.url, cfg.anonKey, {
-        fetch: wrap,
-        auth: { persistSession: true, autoRefreshToken: true, fetch: wrap }
-      });
-    },
-    onAuth(cb) {
-      authCb = cb;
-      client.auth.onAuthStateChange(async (event, session) => {
-        cb(toUser(session && session.user ? session.user : null));
-      });
-      setTimeout(refresh, 60);
-    },
-    async signUp(email, pass, name) {
-      const { data, error } = await client.auth.signUp({ email, password: pass, options: { data: { displayName: name, householdId: '' } } });
-      if (error) throw error;
-      if (!data.user) throw new Error('注册失败，请稍后重试');
-    },
-    async signIn(email, pass) {
-      const { data, error } = await client.auth.signInWithPassword({ email, password: pass });
-      if (error) throw error;
-    },
-    async signOut() { await client.auth.signOut(); if (authCb) authCb(null); },
-    async createHousehold(uid, name, myName) {
-      let hid = null, code = makeCode();
-      for (let i = 0; i < 5; i++) {
-        const { data, error } = await client.from('households').insert({
-          invite_code: code, name, owner: uid, members: [uid], member_profiles: { [uid]: myName }
-        }).select('id').single();
-        if (!error && data) { hid = data.id; break; }
-        if (error && !String(error.message).includes('invite_code')) throw error;
-        code = makeCode();
-      }
-      if (!hid) throw new Error('创建账本失败，请重试');
-      await setMeta({ displayName: myName, householdId: hid });
-      return hid;
-    },
-    async joinHousehold(uid, code, myName) {
-      const { data, error } = await client.rpc('join_household', { p_code: code, p_name: myName });
-      if (error) {
-        if (String((error.message || '')).includes('INVALID_CODE')) throw new Error('邀请码无效，请确认后重试');
-        throw error;
-      }
-      if (!data) throw new Error('邀请码无效，请确认后重试');
-      await setMeta({ displayName: myName, householdId: data });
-      return data;
-    },
-    async getHousehold(hid) {
-      const { data, error } = await client.from('households').select('*').eq('id', hid).single();
-      if (error) return null;
-      return { id: data.id, name: data.name, inviteCode: data.invite_code, members: data.members || [], memberProfiles: data.member_profiles || {} };
-    },
-    watchTx(hid, cb) {
-      let alive = true;
-      const poll = async () => {
-        if (!alive) return;
-        try {
-          const { data, error } = await client.from('transactions')
-            .select('*').eq('household_id', hid).eq('is_deleted', false).order('created_at', { ascending: false });
-          if (!error && data) cb(data.map(t => ({
-            id: t.id, amount: Number(t.amount) || 0, category: t.category || '其他',
-            note: t.note || '', paidBy: t.paid_by || '', paidById: t.paid_by_id || '',
-            date: t.date || '', createdBy: t.created_by || '', isDeleted: false
-          })));
-        } catch (e) {}
-        if (alive) setTimeout(poll, 1500);
-      };
-      poll();
-      return () => { alive = false; };
-    },
-    async addTx(hid, tx) {
-      const { error } = await client.from('transactions').insert({
-        household_id: hid, amount: Number(tx.amount) || 0, category: tx.category, note: tx.note,
-        paid_by: tx.paidBy, paid_by_id: tx.paidById, date: tx.date, created_by: tx.createdBy, is_deleted: false
-      });
-      if (error) throw error;
-    },
-    async delTx(hid, id) {
-      const { error } = await client.from('transactions').update({ is_deleted: true }).eq('id', id);
-      if (error) throw error;
-    },
-  };
-})();
 
 const S = { be: null, user: null, hh: null, txs: [], cat: '油费', authMode: 'signin', setupMode: 'create' };
 
